@@ -62,6 +62,23 @@ async function handleGet(res, code, filePath) {
   return sendImage(res, image, 'MISS');
 }
 
+async function handlePut(req, res, filePath) {
+  // тіло запиту приходить потоком: збираємо шматки через async-ітерацію (без колбеків)
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const body = Buffer.concat(chunks);
+
+  if (body.length === 0) {
+    return sendText(res, 400, 'Тіло запиту порожнє: передайте картинку');
+  }
+
+  // записує нову картинку або замінює наявну, байти зберігаються без змін
+  await fs.writeFile(filePath, body);
+  return sendText(res, 201, 'Картинку збережено в кеш');
+}
+
 async function main() {
   program.parse();
   const { host, port, cache } = program.opts();
@@ -86,6 +103,13 @@ async function main() {
         }
         const code = path.basename(filePath, '.jpg');
         return await handleGet(res, code, filePath);
+      }
+
+      if (req.method === 'PUT') {
+        if (!filePath) {
+          return sendText(res, 404, 'Невірний шлях. Використовуйте /<код стану>, напр. /404');
+        }
+        return await handlePut(req, res, filePath);
       }
 
       return sendText(res, 405, 'Метод не дозволено', {
