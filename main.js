@@ -79,6 +79,18 @@ async function handlePut(req, res, filePath) {
   return sendText(res, 201, 'Картинку збережено в кеш');
 }
 
+async function handleDelete(res, code, filePath) {
+  try {
+    await fs.unlink(filePath);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return sendText(res, 404, `Картинки для коду ${code} немає в кеші`);
+    }
+    throw err; // інша помилка диска -> 500
+  }
+  return sendText(res, 200, `Картинку для коду ${code} видалено з кешу`);
+}
+
 async function main() {
   program.parse();
   const { host, port, cache } = program.opts();
@@ -110,6 +122,14 @@ async function main() {
           return sendText(res, 404, 'Невірний шлях. Використовуйте /<код стану>, напр. /404');
         }
         return await handlePut(req, res, filePath);
+      }
+
+      if (req.method === 'DELETE') {
+        if (!filePath) {
+          return sendText(res, 404, 'Невірний шлях. Використовуйте /<код стану>, напр. /404');
+        }
+        const code = path.basename(filePath, '.jpg');
+        return await handleDelete(res, code, filePath);
       }
 
       return sendText(res, 405, 'Метод не дозволено', {
